@@ -1,10 +1,10 @@
 import torch
 import torch.nn as nn
-from ModelInterfaces import IASRModel
+from core.models.interfaces import IASRModel
 
 def getASRModel(language: str, use_whisper: bool = True) -> IASRModel:
     if use_whisper:
-        from whisper_wrapper import WhisperASRModel
+        from core.models.whisper_wrapper import WhisperASRModel
         return WhisperASRModel()
     else:
         # Fallback to Silero for English if whisper is false
@@ -13,7 +13,7 @@ def getASRModel(language: str, use_whisper: bool = True) -> IASRModel:
                                                language='en',
                                                device=torch.device('cpu'),
                                                trust_repo=True)
-        from AIModels import NeuralASR
+        from core.models.AIModels import NeuralASR
         model.eval()
         return NeuralASR(model, decoder)
 

@@ -1,6 +1,6 @@
 import torch 
 from transformers import pipeline
-from ModelInterfaces import IASRModel
+from core.models.interfaces import IASRModel
 from typing import Union
 import numpy as np 
 

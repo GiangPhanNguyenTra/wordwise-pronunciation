@@ -1,10 +1,10 @@
-import ModelInterfaces
+import core.models.interfaces as interfaces
 import eng_to_ipa
 
 def get_phonem_converter(language: str):
     return EngPhonemConverter()
 
-class EngPhonemConverter(ModelInterfaces.ITextToPhonemModel):
+class EngPhonemConverter(interfaces.ITextToPhonemModel):
     def __init__(self,) -> None:
         super().__init__()
 

@@ -1,9 +1,9 @@
 import torch
 import json
 import os
-import WordMatching as wm
+import core.algorithms.word_matching as wm
 import utils
-import pronunciationTrainer
+import core.pronunciation_trainer as pronunciation_trainer
 import base64
 import time
 import audioread
@@ -12,7 +12,7 @@ from torchaudio.transforms import Resample
 import io
 import tempfile
 
-trainer_SST_lambda = pronunciationTrainer.getTrainer("en")
+trainer_SST_lambda = pronunciation_trainer.getTrainer("en")
 transform = Resample(orig_freq=48000, new_freq=16000)
 
 def lambda_handler(event, context):

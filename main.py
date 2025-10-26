@@ -7,9 +7,7 @@ from fastapi.templating import Jinja2Templates
 from pydantic import BaseModel
 import json
 
-import tts_service
-import scoring_service
-from sample_service import get_random_word, get_random_sentence
+from services import tts_service, scoring_service, sample_service
 
 app = FastAPI()
 
@@ -30,11 +28,11 @@ async def read_root(request: Request):
 
 @app.post("/getExampleWord")
 async def get_example_word():
-    return get_random_word()
+    return sample_service.get_random_word()
 
 @app.post("/getExampleSentence")
 async def get_example_sentence():
-    return get_random_sentence()
+    return sample_service.get_random_sentence()
 
 @app.post("/getAudioFromText")
 async def get_audio_from_text(payload: TTSRequest):

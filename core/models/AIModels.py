@@ -1,9 +1,9 @@
-import ModelInterfaces
+import core.models.interfaces as interfaces
 import torch
 import numpy as np
 
 
-class NeuralASR(ModelInterfaces.IASRModel):
+class NeuralASR(interfaces.IASRModel):
     word_locations_in_samples = None
     audio_transcript = None
 
@@ -35,7 +35,7 @@ class NeuralASR(ModelInterfaces.IASRModel):
                 nn_output[0, :, :].detach(), audio_length_in_samples, word_align=True)
 
 
-class NeuralTTS(ModelInterfaces.ITextToSpeechModel):
+class NeuralTTS(interfaces.ITextToSpeechModel):
     def __init__(self, model: torch.nn.Module, sampling_rate: int) -> None:
         super().__init__()
         self.model = model
@@ -49,7 +49,7 @@ class NeuralTTS(ModelInterfaces.ITextToSpeechModel):
         return audio_transcript
 
 
-class NeuralTranslator(ModelInterfaces.ITranslationModel):
+class NeuralTranslator(interfaces.ITranslationModel):
     def __init__(self, model: torch.nn.Module, tokenizer) -> None:
         super().__init__()
         self.model = model

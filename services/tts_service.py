@@ -1,13 +1,13 @@
-import models
+import core.models.loader as loader
 import soundfile as sf
 import json
-import AIModels
+import core.models.AIModels as AIModels
 import utils
 import os
 import base64
 
 sampling_rate = 16000
-model_TTS_lambda = AIModels.NeuralTTS(models.getTTSModel('en'), sampling_rate)
+model_TTS_lambda = AIModels.NeuralTTS(loader.getTTSModel('en'), sampling_rate)
 
 def lambda_handler(event, context):
     body = json.loads(event['body'])

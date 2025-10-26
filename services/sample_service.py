@@ -1,6 +1,6 @@
 import pandas as pd
 import json
-import RuleBasedModels
+import core.models.rule_based as rule_based
 import random
 
 class TextDataset():
@@ -18,7 +18,7 @@ class TextDataset():
 sample_folder = "./databases/"
 db_words = TextDataset(pd.read_csv(sample_folder + 'data_en_words.csv', delimiter='\t'))
 db_sentences = TextDataset(pd.read_csv(sample_folder + 'data_en_sentences.csv', delimiter='\t'))
-ipa_converter = RuleBasedModels.get_phonem_converter('en')
+ipa_converter = rule_based.get_phonem_converter('en')
 
 def get_random_word():
     sample_idx = random.randint(0, len(db_words) - 1)

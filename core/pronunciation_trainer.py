@@ -1,16 +1,16 @@
 import torch
 import numpy as np
-import models as mo
-import WordMetrics
-import WordMatching as wm
-import ModelInterfaces as mi
-import RuleBasedModels
+import core.models.loader as mo
+import core.algorithms.word_metrics as word_metrics
+import core.algorithms.word_matching as wm
+import core.models.interfaces as mi
+import core.models.rule_based as rule_based
 from string import punctuation
 import time
 
 def getTrainer(language: str):
     asr_model = mo.getASRModel(language, use_whisper=True)
-    phonem_converter = RuleBasedModels.EngPhonemConverter()
+    phonem_converter = rule_based.EngPhonemConverter()
     trainer = PronunciationTrainer(asr_model, phonem_converter)
     return trainer
 
@@ -123,7 +123,7 @@ class PronunciationTrainer:
         for pair in real_and_transcribed_words_ipa:
             real_without_punctuation = self.removePunctuation(pair[0]).lower()
             transcribed_without_punctuation = self.removePunctuation(pair[1]).lower()
-            number_of_word_mismatches = WordMetrics.edit_distance_python(
+            number_of_word_mismatches = word_metrics.edit_distance_python(
                 real_without_punctuation, transcribed_without_punctuation)
             total_mismatches += number_of_word_mismatches
             number_of_phonemes_in_word = len(real_without_punctuation)

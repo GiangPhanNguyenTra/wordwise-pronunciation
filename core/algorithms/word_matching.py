@@ -1,4 +1,4 @@
-import WordMetrics
+import core.algorithms.word_metrics as word_metrics
 import numpy as np
 from string import punctuation
 from dtwalign import dtw_from_distance_matrix
@@ -18,7 +18,7 @@ def get_word_distance_matrix(words_estimated: list, words_real: list) -> np.ndar
         (number_of_estimated_words+offset_blank, number_of_real_words))
     for idx_estimated in range(number_of_estimated_words):
         for idx_real in range(number_of_real_words):
-            word_distance_matrix[idx_estimated, idx_real] = WordMetrics.edit_distance_python(
+            word_distance_matrix[idx_estimated, idx_real] = word_metrics.edit_distance_python(
                 words_estimated[idx_estimated], words_real[idx_real])
 
     if offset_blank == 1:
@@ -110,7 +110,7 @@ def get_resulting_string(mapped_indices: np.ndarray, words_estimated: list, word
                 idx_above_word = single_word_idx >= len(words_estimated)
                 if idx_above_word:
                     continue
-                error_word = WordMetrics.edit_distance_python(
+                error_word = word_metrics.edit_distance_python(
                     words_estimated[single_word_idx], words_real[word_idx])
                 if error_word < error:
                     error = error_word*1
