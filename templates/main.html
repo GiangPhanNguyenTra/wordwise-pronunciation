@@ -9,7 +9,6 @@
       integrity="sha384-1BmE4kWBq78iYhFldvKuhfTAU6auU8tT94WrHftjDbrCEXSU1oBoqyl2QvZ6jIW3"
       crossorigin="anonymous"
     />
-    <link rel="stylesheet" href="/static/css/style-new.css" />
     <script src="/static/javascript/callbacks.js"></script>
     <title>AI Pronunciation Trainer</title>
     <script
@@ -20,151 +19,484 @@
       href="https://fonts.googleapis.com/icon?family=Material+Icons"
       rel="stylesheet"
     />
+
+    <style>
+      /* Globals and Reset */
+      body {
+        background-color: #f4f4f9; /* Light, modern background */
+        font-family: "Segoe UI", Tahoma, Geneva, Verdana, sans-serif;
+        padding: 10px;
+        max-width: 100%;
+      }
+
+      .app-container {
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: 0 15px;
+      }
+
+      /* Header */
+      .app-header {
+        display: flex;
+        align-items: center;
+        padding: 15px 0;
+        border-bottom: 2px solid #ccc;
+        margin-bottom: 20px;
+      }
+
+      .home-icon {
+        font-size: 3em !important;
+        color: #2c3e50; /* Darker blue for prominence */
+        cursor: pointer;
+        margin-right: 15px;
+        transition: color 0.2s;
+      }
+      .home-icon:hover {
+        color: #3498db;
+      }
+
+      #main_title {
+        color: #2c3e50;
+        font-weight: 700;
+        font-size: 2.5em;
+        margin: 0;
+      }
+
+      /* Score and Language Bar */
+      .score-bar-container {
+        display: flex;
+        justify-content: flex-start;
+        align-items: center;
+        padding: 10px 0;
+        margin-bottom: 20px;
+      }
+
+      .score-text {
+        font-size: 1.1em;
+        font-weight: 500;
+        color: #555;
+        margin: 0 10px 0 0;
+      }
+
+      /* Main Card */
+      .main-card-container {
+        position: relative;
+        background: #ffffff;
+        padding: 30px;
+        border-radius: 20px;
+        box-shadow: 0 6px 20px rgba(0, 0, 0, 0.1);
+        min-height: 450px;
+        margin-bottom: 30px;
+        display: flex;
+        flex-direction: row;
+      }
+
+      /* Text Area */
+      .main-text-area {
+        flex-grow: 1;
+        padding-left: 120px; /* Chừa chỗ cho control buttons */
+        padding-right: 40px;
+        overflow-y: auto;
+      }
+
+      .original-text {
+        font-size: 2.2em;
+        font-weight: 600;
+        color: #2c3e50; /* Primary text color */
+        margin-bottom: 15px;
+        cursor: text;
+        line-height: 1.4;
+      }
+
+      .ipa-text {
+        font-size: 1.5em;
+        color: #7f8c8d; /* Muted grey for IPA/instructions */
+        font-style: italic;
+        margin-bottom: 10px;
+      }
+
+      .recorded-ipa-text {
+        font-size: 1.6em;
+        color: #4caf50; /* Highlighted color for recorded IPA */
+        font-weight: 500;
+        margin-top: 10px;
+      }
+
+      .translated-text {
+        font-size: 1.2em;
+        color: #95a5a6;
+        margin-top: 10px;
+      }
+
+      /* Control Buttons (Left Sidebar) */
+      .control-buttons-group {
+        width: 120px; /* Fixed width for button group */
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        gap: 15px;
+        position: absolute;
+        left: 30px;
+        top: 30px;
+      }
+
+      .action-button {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        width: 70px;
+        height: 70px;
+        border-radius: 50%;
+        background-color: #3498db; /* Blue for action buttons */
+        color: white;
+        text-decoration: none;
+        box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        transition: all 0.3s ease;
+      }
+
+      .action-button:hover {
+        background-color: #2980b9;
+        transform: translateY(-2px);
+      }
+
+      .action-button i {
+        font-size: 1.8em;
+        margin-bottom: 3px;
+      }
+
+      .button-label {
+        font-size: 0.7em;
+        line-height: 1;
+      }
+
+      .accuracy-result {
+        text-align: center;
+        margin-top: 20px;
+        font-size: 1.1em;
+        color: #2c3e50;
+        font-weight: 600;
+      }
+
+      .accuracy-result .label {
+        display: block;
+        font-size: 0.8em;
+        font-weight: normal;
+        color: #7f8c8d;
+      }
+
+      /* Next Button */
+      .next-button-container {
+        position: absolute;
+        right: 0px; /* Dịch sát ra cạnh phải */
+        top: 0;
+        height: 100%;
+      }
+
+      .next-button {
+        width: 60px;
+        height: 100%; /* Kéo dài hết chiều cao card */
+        border: none;
+        background-color: #58636d; /* Màu xám đậm */
+        color: white;
+        font-size: 2em;
+        border-radius: 0 20px 20px 0; /* Bo tròn chỉ ở cạnh phải */
+        cursor: pointer;
+        transition: background-color 0.3s ease;
+      }
+
+      .next-button:hover {
+        background-color: #4caf50; /* Green highlight on hover */
+      }
+
+      /* IPA Comparison Card */
+      .ipa-comparison-card {
+        position: fixed;
+        right: 20px;
+        bottom: 20%;
+        width: 280px;
+        background: #ffffff;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 2px 10px rgba(0, 0, 0, 0.1);
+        text-align: center;
+      }
+
+      .ipa-comparison-text {
+        font-size: 1.2em;
+        color: #34495e;
+        font-family: monospace; /* Monospace font for technical readability */
+        margin: 0;
+      }
+
+      /* Mic Button */
+      .mic-button-div {
+        position: fixed;
+        left: 50%;
+        transform: translateX(-50%);
+        bottom: 30px;
+        z-index: 1000;
+      }
+
+      .mic-button {
+        display: block;
+        width: 80px;
+        height: 80px;
+        border-radius: 50%;
+        background-color: #4caf50; /* Prominent green */
+        color: white;
+        text-align: center;
+        line-height: 80px;
+        text-decoration: none;
+        box-shadow: 0 8px 15px rgba(0, 0, 0, 0.2);
+        transition: all 0.3s ease;
+      }
+
+      .mic-button:hover {
+        background-color: #45a049;
+        transform: scale(1.05);
+      }
+
+      .mic-button i {
+        font-size: 3em !important;
+        vertical-align: middle;
+      }
+
+      /* Disabled State */
+      a.disabled,
+      .mic-button.disabled {
+        pointer-events: none;
+        background-color: #ccc !important;
+        box-shadow: none !important;
+        opacity: 0.6;
+      }
+
+      /* Radio Buttons (Mode Selector) */
+      .mode-radio-group {
+        position: fixed;
+        bottom: 35px;
+        left: 30px;
+        background: #fff;
+        padding: 5px;
+        border-radius: 10px;
+        box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+        display: flex;
+        gap: 5px;
+      }
+
+      .mode-radio-group input {
+        width: max-content;
+        height: 100%;
+        appearance: none;
+        outline: none;
+        cursor: pointer;
+        border-radius: 8px;
+        padding: 6px 12px;
+        background: #ecf0f1;
+        color: #7f8c8d;
+        font-size: 0.9em;
+        transition: all 100ms linear;
+      }
+
+      .mode-radio-group input:checked {
+        background-image: linear-gradient(180deg, #4caf50, #45a049);
+        color: #fff;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+      }
+
+      .mode-radio-group input:before {
+        content: attr(label);
+        display: inline-block;
+        text-align: center;
+        width: 100%;
+      }
+
+      /* ---------------------------------------------------- */
+      /* Mobile Responsiveness (Screen width <= 768px) */
+      /* ---------------------------------------------------- */
+      @media only screen and (max-width: 768px) {
+        /* Header */
+        #main_title {
+          font-size: 1.8em;
+        }
+
+        .home-icon {
+          font-size: 2.5em !important;
+        }
+
+        /* Main Card Adjustments */
+        .main-card-container {
+          flex-direction: column;
+          padding: 15px;
+          min-height: 300px;
+        }
+
+        /* Control Buttons (Move to top) */
+        .control-buttons-group {
+          position: static;
+          flex-direction: row;
+          justify-content: space-around;
+          width: 100%;
+          margin-bottom: 20px;
+          gap: 10px;
+        }
+
+        .action-button {
+          width: 50px;
+          height: 50px;
+        }
+
+        .button-label {
+          display: none; /* Hide label on mobile to save space */
+        }
+
+        .accuracy-result {
+          font-size: 0.9em;
+          margin: 0;
+          flex-grow: 1;
+          text-align: right;
+        }
+
+        .accuracy-result .label {
+          display: none;
+        }
+
+        /* Text Area Adjustments */
+        .main-text-area {
+          padding-left: 0; /* Bỏ padding cũ */
+          padding-right: 0;
+          min-height: 100px;
+        }
+
+        .original-text {
+          font-size: 1.4em;
+        }
+
+        .ipa-text,
+        .recorded-ipa-text,
+        .translated-text {
+          font-size: 0.9em;
+        }
+
+        /* Next Button (Move to top right) */
+        .next-button-container {
+          position: absolute;
+          right: 0;
+          top: 0;
+          height: 50px; /* Chiều cao nhỏ hơn trên mobile */
+        }
+
+        .next-button {
+          width: 45px;
+          height: 50px;
+          font-size: 1.5em;
+          border-radius: 0 20px 0 0;
+        }
+
+        /* Mic Button */
+        .mic-button-div {
+          bottom: 15px; /* Đặt gần đáy hơn */
+        }
+
+        .mic-button {
+          width: 65px;
+          height: 65px;
+          line-height: 65px;
+        }
+
+        .mic-button i {
+          font-size: 2.5em !important;
+        }
+
+        /* IPA Comparison Card (Move to bottom center) */
+        .ipa-comparison-card {
+          position: fixed;
+          left: 50%;
+          transform: translateX(-50%);
+          bottom: 100px;
+          width: 90%;
+          max-width: 400px;
+          padding: 10px;
+        }
+
+        /* Radio Buttons */
+        .mode-radio-group {
+          left: 15px;
+          bottom: 30px;
+          transform: none;
+        }
+      }
+    </style>
   </head>
 
-  <body
-    style="height: 100%; width: 100%; background-color: white; max-width: 90%"
-  >
-    <div>
-      <div style="display: flex; flex-direction: row">
-        <div style="display: inline-block; margin-left: 1.5em">
-          <i
-            class="material-icons icon-text-home"
-            style="text-align: right"
-            onclick="history.go(0)"
-            >home</i
-          >
-        </div>
+  <body>
+    <div class="app-container">
+      <header class="app-header">
+        <i class="material-icons home-icon" onclick="history.go(0)"> home </i>
         <h1 id="main_title">AI Pronunciation Trainer</h1>
+      </header>
+      <div class="score-bar-container">
+        <p class="score-text">Language: **English**</p>
+        <p id="section_accuracy" class="score-text">| **Score: 0**</p>
       </div>
-
-      <div class="expanded">
-        <div
-          class="horizontal-flexbox"
-          style="display: flex; flex-direction: row"
-        >
-          <p
-            class="accuracy-text"
-            style="
-              font-size: 1em;
-              text-align: left;
-              padding-top: 3px;
-              padding-left: 5px;
-            "
+      <div class="main-card-container">
+        <div id="nextButtonDiv" class="next-button-container">
+          <button
+            id="buttonNext"
+            class="next-button"
+            onclick="javascript:getNextSample()"
           >
-            Language: English
-          </p>
-          <p
-            id="section_accuracy"
-            class="accuracy-text"
-            style="text-align: left; color: black; font-size: larger"
-          >
-            | Score: 0
-          </p>
+            <i class="material-icons">arrow_forward_ios</i>
+          </button>
         </div>
-      </div>
-
-      <div style="margin-bottom: 200px"></div>
-
-      <div class="container">
-        <div class="horizontal-flexbox" style="position: absolute; top: 2%">
+        <div id="text-area" class="main-text-area">
+          <p id="original_script" class="original-text" contenteditable="true">
+            Click on the bar on the right to generate a new word or sentence.
+          </p>
+          <p id="ipa_script" class="ipa-text text-muted">
+            Before speaking, click on the mic button below to start recording
+            and then click again when you're done.
+          </p>
+          <p id="recorded_ipa_script" class="recorded-ipa-text"></p>
+          <p id="translated_script" class="translated-text text-muted"></p>
+        </div>
+        <div class="control-buttons-group">
           <a
             id="playSampleAudio"
             href="javascript:playAudio()"
-            class="round-button disabled"
-            style="
-              color: white;
-              text-align: center;
-              position: absolute;
-              top: 2%;
-            "
-            ><i class="material-icons icon-text">play_arrow</i>
+            class="action-button disabled"
+          >
+            <i class="material-icons">play_arrow</i>
+            <span class="button-label">Sample</span>
           </a>
           <a
             id="playRecordedAudio"
             href="javascript:playRecording()"
-            class="round-button disabled"
-            style="
-              color: white;
-              text-align: center;
-              position: absolute;
-              top: 15%;
-            "
-            ><i class="material-icons icon-text">record_voice_over</i>
+            class="action-button disabled"
+          >
+            <i class="material-icons">record_voice_over</i>
+            <span class="button-label">Your Rec.</span>
           </a>
-          <p
-            id="pronunciation_accuracy"
-            class="expanded accuracy-text"
-            style="
-              text-align: center;
-              color: black;
-              position: absolute;
-              top: 27%;
-            "
-          >
-            -
+          <p id="pronunciation_accuracy" class="accuracy-result">
+            <span class="label">Accuracy:</span> -
           </p>
-        </div>
-
-        <div id="text-area" class="main-text-div">
-          <p
-            id="original_script"
-            class="bigger-text text-primary main-text"
-            contenteditable
-          >
-            Click on the bar on the right to generate a new word or sentence.
-          </p>
-          <p id="ipa_script" class="text-muted bigger-text ipa-text">
-            Before speaking, click on the mic button below to start recording
-            and then click again when you're done.
-          </p>
-          <p id="recorded_ipa_script" class="text-primary ipa-text"></p>
-          <p id="translated_script" class="text-muted medium-text ipa-text"></p>
-        </div>
-
-        <div
-          id="nextButtonDiv"
-          style="position: absolute; left: 90%; top: 0%; height: 100%"
-          class="flex-container"
-        >
-          <button
-            id="buttonNext"
-            class="expanded button-next"
-            onclick="javascript:getNextSample()"
-          >
-            <span></span>
-          </button>
         </div>
       </div>
-
-      <div
-        class="container-small flex expand"
-        style="align-items: center; text-align: center; vertical-align: middle"
-      >
-        <p
-          id="single_word_ipa_pair"
-          class="expand ipa-text-small"
-          style="text-align: center; vertical-align: middle"
-        >
-          Reference | Spoken
+      <div class="ipa-comparison-card">
+        <p id="single_word_ipa_pair" class="ipa-comparison-text">
+          **Reference** | **Spoken**
         </p>
       </div>
-
-      <div id="btn-record" class="expanded mic-button-div">
+      <div id="btn-record" class="mic-button-div">
         <a
           id="recordAudio"
           href="javascript:updateRecordingState()"
-          class="round-button-mic disabled"
-          style="color: white; text-align: center"
-          ><i id="recordIcon" class="material-icons icon-text-mic">mic</i>
+          class="mic-button disabled"
+        >
+          <i id="recordIcon" class="material-icons">mic</i>
         </a>
       </div>
-
-      <div
-        id="radio-difficulty"
-        class="radio"
-        style="position: fixed; top: 95%; left: 2%"
-      >
+      <div id="radio-difficulty" class="mode-radio-group">
         <input
           label="Words"
           type="radio"
@@ -181,44 +513,6 @@
           onclick="javascript:getNextSample()"
         />
       </div>
-    </div>
-
-    <p class="credits-icon-div">By Thiago Lobato.</p>
-    <div class="link-icon-div">
-      <a
-        href="https://github.com/Thiagohgl/ai-pronunciation-trainer"
-        target="”_blank”"
-        style="text-decoration: none; vertical-align: middle"
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          class="svg-icon"
-        >
-          <path
-            d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-          />
-        </svg>
-      </a>
-      <a
-        href="https://www.linkedin.com/in/thiagohgl/"
-        target="”_blank”"
-        style="
-          text-decoration: none;
-          vertical-align: middle;
-          padding-top: 2.3em;
-        "
-      >
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          viewBox="0 0 24 24"
-          class="svg-icon"
-        >
-          <path
-            d="M19 0h-14c-2.761 0-5 2.239-5 5v14c0 2.761 2.239 5 5 5h14c2.762 0 5-2.239 5-5v-14c0-2.761-2.238-5-5-5zm-11 19h-3v-11h3v11zm-1.5-12.268c-.966 0-1.75-.79-1.75-1.764s.784-1.764 1.75-1.764 1.75.79 1.75 1.764-.783 1.764-1.75 1.764zm13.5 12.268h-3v-5.604c0-3.368-4-3.113-4 0v5.604h-3v-11h3v1.765c1.396-2.586 7-2.777 7 2.476v6.759z"
-          />
-        </svg>
-      </a>
     </div>
   </body>
 </html>
