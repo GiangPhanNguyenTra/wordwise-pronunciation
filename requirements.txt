@@ -18,3 +18,4 @@ sentencepiece
 
 fastapi
 uvicorn[standard]
+rapidfuzz
