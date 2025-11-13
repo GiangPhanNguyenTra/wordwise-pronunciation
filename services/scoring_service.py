@@ -21,7 +21,7 @@ def lambda_handler(event, context):
 
     if ',' in audio_string:
         header, encoded = audio_string.split(",", 1)
-        file_bytes = base6.b64decode(encoded.encode('utf-8'))
+        file_bytes = base64.b64decode(encoded.encode('utf-8'))
     else:
         file_bytes = base64.b64decode(audio_string.encode('utf-8'))
 
