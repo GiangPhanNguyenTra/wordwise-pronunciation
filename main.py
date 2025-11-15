@@ -8,6 +8,7 @@ from pydantic import BaseModel
 import json
 
 from services import tts_service, scoring_service, sample_service
+from core.models.rule_based import get_phonem_converter
 from fastapi.middleware.cors import CORSMiddleware
 
 app = FastAPI(title="Word Wise AI Pronunciation Scoring")
@@ -29,6 +30,10 @@ class ScoreRequest(BaseModel):
     title: str
     base64Audio: str
     language: str
+
+class IPARequest(BaseModel):
+    text: str
+
 
 @app.get("/", response_class=HTMLResponse)
 async def read_root(request: Request):
@@ -56,6 +61,17 @@ async def get_accuracy_from_recorded_audio(payload: ScoreRequest):
     except Exception as e:
         print(f'Error in GetAccuracyFromRecordedAudio: {e}')
         return {"error": str(e)}
+    
+@app.post("/getIPA")
+async def get_ipa(payload: IPARequest):
+    try:
+        converter = get_phonem_converter("en")
+        ipa = converter.convertToPhonem(payload.text)
+        return {"ipa": ipa}
+    except Exception as e:
+        print(f"Error in getIPA: {e}")
+        return {"error": str(e)}
+
 
 if __name__ == "__main__":
     url = "http://127.0.0.1:8000"
