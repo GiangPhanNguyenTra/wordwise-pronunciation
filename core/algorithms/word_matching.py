@@ -77,6 +77,72 @@ def get_best_mapped_words(words_estimated: list, words_real: list, use_dtw:bool 
     return mapped_words, mapped_words_indices
 
 def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
+    real = real_word or ""
+    trans = transcribed_word or ""
+    n = len(real)
+    m = len(trans)
+
+    if n == 0:
+        return []
+
+    # DP edit-distance alignment
+    dp = np.zeros((n + 1, m + 1), dtype=int)
+    for i in range(1, n + 1):
+        dp[i, 0] = i
+    for j in range(1, m + 1):
+        dp[0, j] = j
+
+    for i in range(1, n + 1):
+        rch = real[i - 1].lower()
+        for j in range(1, m + 1):
+            tch = trans[j - 1].lower()
+            cost_sub = 0 if rch == tch else 1
+            dp[i, j] = min(
+                dp[i - 1, j] + 1,          # delete
+                dp[i, j - 1] + 1,          # insert
+                dp[i - 1, j - 1] + cost_sub  # substitute / match
+            )
+
+    # backtrack để biết mỗi chữ real[i] align với trans[j] nào
+    aligned_j_for_i = [None] * n
+    i, j = n, m
+    while i > 0 or j > 0:
+        if i > 0 and j > 0:
+            rch = real[i - 1].lower()
+            tch = trans[j - 1].lower()
+            cost_sub = 0 if rch == tch else 1
+            if dp[i, j] == dp[i - 1, j - 1] + cost_sub:
+                aligned_j_for_i[i - 1] = j - 1  # i-1 của real map với j-1 của trans (có thể đúng hoặc sai)
+                i -= 1
+                j -= 1
+                continue
+        if i > 0 and dp[i, j] == dp[i - 1, j] + 1:
+            i -= 1
+        elif j > 0 and dp[i, j] == dp[i, j - 1] + 1:
+            j -= 1
+        else:
+            if i > 0:
+                i -= 1
+            elif j > 0:
+                j -= 1
+
+    is_letter_correct = [0] * n
+    for idx, ch in enumerate(real):
+        ch_low = ch.lower()
+        if ch in punctuation:
+            is_letter_correct[idx] = 1
+            continue
+        mapped_j = aligned_j_for_i[idx]
+        if mapped_j is not None and 0 <= mapped_j < m:
+            if ch_low == trans[mapped_j].lower():
+                is_letter_correct[idx] = 1
+            else:
+                is_letter_correct[idx] = 0
+        else:
+            is_letter_correct[idx] = 0
+
+    return is_letter_correct
+
     # Sửa lỗi immutable string: chuyển transcribed_word thành list để có thể sửa đổi
     transcribed_list = list(transcribed_word)
     is_letter_correct = [None] * len(real_word)    
