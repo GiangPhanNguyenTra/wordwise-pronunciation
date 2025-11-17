@@ -47,6 +47,18 @@ async def get_example_word():
 async def get_example_sentence():
     return sample_service.get_random_sentence()
 
+class SampleRequest(BaseModel):
+    count: int
+
+@app.post("/getExampleWords/{count}")
+async def get_example_words(count: int):
+    return sample_service.get_random_words(count)
+
+@app.post("/getExampleSentences/{count}")
+async def get_example_sentences(count: int):
+    return sample_service.get_random_sentences(count)
+
+
 @app.post("/getAudioFromText")
 async def get_audio_from_text(payload: TTSRequest):
     event = {'body': payload.json()}

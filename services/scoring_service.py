@@ -41,22 +41,18 @@ def lambda_handler(event, context):
     signal = transform(torch.Tensor(signal)).unsqueeze(0)
     result = trainer_SST_lambda.processAudioForGivenText(signal, real_text)
 
-    # Lấy các cặp từ đã được so khớp bởi hàm chính
     real_and_transcribed_words = result['real_and_transcribed_words']
 
-    # --- LOGIC CŨ ĐƯỢC PHỤC HỒI VÀ SỬA LỖI ---
-    # Logic này không hiệu quả nhưng nó tương thích với các thuật toán cũ
     is_letter_correct_all_words = ''
     for real_word, transcribed_word in real_and_transcribed_words:
         if transcribed_word == '-':
              is_letter_correct = [0] * len(real_word)
         else:
-            # So sánh từng ký tự theo logic cũ
             is_letter_correct = wm.getWhichLettersWereTranscribedCorrectly(
                 real_word, transcribed_word)
         
         is_letter_correct_all_words += ''.join(map(str, is_letter_correct)) + ' '
-    # --- KẾT THÚC PHẦN PHỤC HỒI ---
+
 
     res = {
         'real_transcript': result['recording_transcript'],

@@ -41,3 +41,39 @@ def get_random_sentence():
         'ipa_transcript': ipa,
         'transcript_translation': ""
     }
+
+
+def get_random_words(n: int):
+    n = min(n, len(db_words))  
+    sample_indices = random.sample(range(len(db_words)), n)
+
+    results = []
+    for idx in sample_indices:
+        transcript = db_words[idx]
+        ipa = ipa_converter.convertToPhonem(transcript[0])
+
+        results.append({
+            'real_transcript': transcript,
+            'ipa_transcript': ipa,
+            'transcript_translation': ""
+        })
+
+    return results
+
+
+def get_random_sentences(n: int):
+    n = min(n, len(db_sentences))
+    sample_indices = random.sample(range(len(db_sentences)), n)
+
+    results = []
+    for idx in sample_indices:
+        transcript = db_sentences[idx]
+        ipa = ipa_converter.convertToPhonem(transcript[0])
+
+        results.append({
+            'real_transcript': transcript,
+            'ipa_transcript': ipa,
+            'transcript_translation': ""
+        })
+
+    return results
