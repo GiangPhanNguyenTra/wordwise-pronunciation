@@ -5,9 +5,12 @@ import re
 from g2p_en import G2p
 from functools import lru_cache
 
+
 nltk.download("averaged_perceptron_tagger", quiet=True)
 
+
 TOKEN_REGEX = re.compile(r"[A-Za-z]+(?:'[A-Za-z]+)?|[.,!?;:]")
+
 
 def smart_join(tokens):
     s = ""
@@ -17,6 +20,7 @@ def smart_join(tokens):
         else:
             s += " " + t
     return s.strip()
+
 
 HETERONYM_RULES = {
     "record":  {"NN": "EH1", "VB": "AO1", "VBP": "AO1", "VBZ": "AO1", "VBD": "AO1", "VBG": "AO1"},
@@ -32,13 +36,17 @@ HETERONYM_RULES = {
     "decrease":{"NN": "IY1", "VB": "IY2"}
 }
 
+
 try:
     g2p_model = G2p()
 except:
     g2p_model = None
 
 
+
+
 class EngPhonemConverter(interfaces.ITextToPhonemModel):
+
 
     def __init__(self):
         super().__init__()
@@ -46,6 +54,7 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
             self.cmu = cmudict.dict()
         except:
             self.cmu = None
+
 
         self.map = {
             'AA':'ɑ','AE':'æ','AO':'ɔ','AW':'aʊ','AY':'aɪ','B':'b','CH':'tʃ',
@@ -55,13 +64,16 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
             'UW':'u','V':'v','W':'w','Y':'j','Z':'z','ZH':'ʒ','AX':'ə'
         }
 
+
         if g2p_model:
             self.g2p = lru_cache(maxsize=10000)(g2p_model.__call__)
         else:
             self.g2p = None
 
+
     def _tokenize(self, s):
         return TOKEN_REGEX.findall(s)
+
 
     def _map_phone(self, ph):
         m = re.match(r"^([A-Z]+)([0-2])?$", ph)
@@ -78,6 +90,7 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
         ipa = self.map.get(base, base.lower())
         return mark + ipa
 
+
     def _map_g2p(self, phones):
         out = ""
         for p in phones:
@@ -85,11 +98,13 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
                 out += self._map_phone(p)
         return out
 
+
     def _check_rule(self, pron, code):
         for ph in pron:
             if code in ph:
                 return True
         return False
+
 
     def _choose_pron(self, word, pos, prons):
         if word in HETERONYM_RULES:
@@ -100,11 +115,14 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
                             return p
         return prons[0]
 
+
     def convertToPhonem(self, s):
         tokens = self._tokenize(s)
 
+
         alpha_tokens = [t for t in tokens if t[0].isalpha()]
         pos_tags = nltk.pos_tag(alpha_tokens)
+
 
         pos_by_index = {}
         j = 0
@@ -113,14 +131,17 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
                 pos_by_index[i] = pos_tags[j][1]
                 j += 1
 
+
         out = []
         for i, tk in enumerate(tokens):
             if tk in ".,!?;:":
                 out.append(tk)
                 continue
 
+
             w = tk.lower()
             pos = pos_by_index.get(i, "")
+
 
             if self.cmu and w in self.cmu:
                 pr = self._choose_pron(w, pos, self.cmu[w])
@@ -129,15 +150,20 @@ class EngPhonemConverter(interfaces.ITextToPhonemModel):
                 out.append(ipa)
                 continue
 
+
             if self.g2p:
                 ipa = self._map_g2p(self.g2p(w))
                 ipa = ipa.replace("ˈ","").replace("ˌ","")
                 out.append(ipa)
                 continue
 
+
             out.append(tk)
 
+
         return smart_join(out)
+
+
 
 
 _converter = None

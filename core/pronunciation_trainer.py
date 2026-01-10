@@ -1,162 +1,166 @@
 import torch
 import numpy as np
-import core.models.loader as mo
-import core.algorithms.word_metrics as word_metrics
-import core.algorithms.word_matching as wm
-import core.models.interfaces as mi
-import core.models.rule_based as rule_based
-from string import punctuation
 import time
+from string import punctuation
+import re
+
+from core.models import loader as mo
+from core.models import rule_based
+from core.models import interfaces as mi
+from core.algorithms import word_matching as wm
+from core.algorithms import word_metrics
+from core.algorithms import phonetic_scoring
+
+DIGIT2WORD = {
+    "0": "zero", "1": "one", "2": "two", "3": "three", "4": "four",
+    "5": "five", "6": "six", "7": "seven", "8": "eight", "9": "nine"
+}
+
+NUMBER_TOKEN_REGEX = re.compile(r"\d+")
+
+
+def normalize_numbers_in_text(text: str) -> str:
+    if not text:
+        return text
+
+    def repl(m):
+        num = m.group(0)
+        return " " + " ".join(DIGIT2WORD.get(c, c) for c in num) + " "
+
+    text = NUMBER_TOKEN_REGEX.sub(repl, text)
+    text = re.sub(r"\s+", " ", text).strip()
+    return text
+
 
 def getTrainer(language: str):
     asr_model = mo.getASRModel(language, use_whisper=True)
-    phonem_converter = rule_based.EngPhonemConverter()
+    phonem_converter = rule_based.get_phonem_converter(language)
     trainer = PronunciationTrainer(asr_model, phonem_converter)
     return trainer
 
-class PronunciationTrainer:
-    current_transcript: str
-    current_ipa: str
-    current_recorded_audio: torch.Tensor
-    current_recorded_transcript: str
-    current_recorded_word_locations: list
-    current_recorded_intonations: torch.tensor
-    current_words_pronunciation_accuracy = []
-    categories_thresholds = np.array([80, 60, 59])
-    sampling_rate = 16000
 
-    def __init__(self, asr_model: mi.IASRModel, word_to_ipa_coverter: mi.ITextToPhonemModel) -> None:
+class PronunciationTrainer:
+    sampling_rate = 16000
+    categories_thresholds = np.array([80, 60, 40])
+
+    def __init__(self, asr_model: mi.IASRModel, word_to_ipa_coverter: mi.ITextToPhonemModel, use_enhanced_scoring: bool = True) -> None:
         self.asr_model = asr_model
         self.ipa_converter = word_to_ipa_coverter
+        self.use_enhanced_scoring = use_enhanced_scoring
 
-    def getTranscriptAndWordsLocations(self, audio_length_in_samples: int):
-        audio_transcript = self.asr_model.getTranscript()
-        word_locations_in_samples = self.asr_model.getWordLocations()
-        fade_duration_in_samples = 0.05 * self.sampling_rate
-        word_locations_in_samples = [(int(np.maximum(0, word['start_ts'] - fade_duration_in_samples)), int(np.minimum(
-            audio_length_in_samples - 1, word['end_ts'] + fade_duration_in_samples))) for word in word_locations_in_samples]
-        return audio_transcript, word_locations_in_samples
+    def processAudioForGivenText(self, recordedAudio: torch.Tensor, real_text: str):
+        start_time_asr = time.time()
+        self.asr_model.processAudio(self.preprocessAudio(recordedAudio))
+        recording_transcript = self.asr_model.getTranscript()
+        word_locations = self.asr_model.getWordLocations()
+        print(f'Time for ASR: {time.time() - start_time_asr:.4f}s')
 
-    def getWordsRelativeIntonation(self, Audio: torch.tensor, word_locations: list):
-        intonations = torch.zeros((len(word_locations), 1))
-        intonation_fade_samples = 0.3 * self.sampling_rate
-        print(intonations.shape)
-        for word in range(len(word_locations)):
-            intonation_start = int(np.maximum(
-                0, word_locations[word][0] - intonation_fade_samples))
-            intonation_end = int(np.minimum(
-                Audio.shape[1] - 1, word_locations[word][1] + intonation_fade_samples))
-            intonations[word] = torch.sqrt(torch.mean(
-                Audio[0][intonation_start:intonation_end] ** 2))
-        intonations = intonations / torch.mean(intonations)
-        return intonations
+        real_text_norm = normalize_numbers_in_text(real_text)
+        recording_transcript_norm = normalize_numbers_in_text(recording_transcript)
 
-    def processAudioForGivenText(self, recordedAudio: torch.Tensor = None, real_text=None):
-        start = time.time()
-        recording_transcript, recording_ipa, word_locations = self.getAudioTranscript(
-            recordedAudio)
-        print('Time for NN to transcript audio: ', str(time.time() - start))
+        real_text_ipa = self.ipa_converter.convertToPhonem(real_text_norm)
+        recording_transcript_ipa = self.ipa_converter.convertToPhonem(recording_transcript_norm)
 
-        start = time.time()
-        real_and_transcribed_words, real_and_transcribed_words_ipa, mapped_words_indices = self.matchSampleAndRecordedWords(
-            real_text, recording_transcript)
-        print('Time for matching transcripts: ', str(time.time() - start))
+        words_real = real_text_norm.split()
+        words_estimated = recording_transcript_norm.split()
+        words_real_ipa = real_text_ipa.split()
+        words_estimated_ipa = recording_transcript_ipa.split()
 
-        start_time, end_time = self.getWordLocationsFromRecordInSeconds(
-            word_locations, mapped_words_indices)
-        
-        # Sửa lỗi nhỏ: Truyền cặp từ IPA vào để tính điểm
-        pronunciation_accuracy, current_words_pronunciation_accuracy = self.getPronunciationAccuracy(
-            real_and_transcribed_words_ipa)
+        start_time_match = time.time()
+        mapped_words_ipa, mapped_indices_ipa = wm.get_best_mapped_words(words_estimated_ipa, words_real_ipa)
+        print(f'Time for IPA matching: {time.time() - start_time_match:.4f}s')
 
-        pronunciation_categories = self.getWordsPronunciationCategory(
-            current_words_pronunciation_accuracy)
+        real_and_transcribed_words = []
+        real_and_transcribed_words_ipa = []
+        mapped_indices = []
 
-        result = {'recording_transcript': recording_transcript,
-                  'real_and_transcribed_words': real_and_transcribed_words,
-                  'recording_ipa': recording_ipa, 'start_time': start_time, 'end_time': end_time,
-                  'real_and_transcribed_words_ipa': real_and_transcribed_words_ipa, 'pronunciation_accuracy': pronunciation_accuracy,
-                  'pronunciation_categories': pronunciation_categories}
+        for i, real_word_ipa in enumerate(words_real_ipa):
+            transcribed_word_ipa = mapped_words_ipa[i]
+            real_and_transcribed_words_ipa.append((real_word_ipa, transcribed_word_ipa))
+
+            real_word_text = words_real[i] if i < len(words_real) else '-'
+
+            est_idx = mapped_indices_ipa[i]
+            transcribed_word_text = words_estimated[est_idx] if 0 <= est_idx < len(words_estimated) else '-'
+
+            real_and_transcribed_words.append((real_word_text, transcribed_word_text))
+            mapped_indices.append(est_idx)
+
+        pronunciation_accuracy, per_word_accuracy = self.getPronunciationAccuracy(real_and_transcribed_words_ipa)
+        pronunciation_categories = self.getWordsPronunciationCategory(per_word_accuracy)
+        start_time, end_time = self.getWordLocationsFromRecordInSeconds(word_locations, mapped_indices)
+
+        result = {
+            'recording_transcript': recording_transcript_norm,
+            'recording_ipa': recording_transcript_ipa,
+            'real_and_transcribed_words': real_and_transcribed_words,
+            'real_and_transcribed_words_ipa': real_and_transcribed_words_ipa,
+            'pronunciation_accuracy': pronunciation_accuracy,
+            'pronunciation_categories': pronunciation_categories,
+            'start_time': start_time,
+            'end_time': end_time
+        }
         return result
 
-    def getAudioTranscript(self, recordedAudio: torch.Tensor = None):
-        current_recorded_audio = recordedAudio
-        current_recorded_audio = self.preprocessAudio(current_recorded_audio)
-        self.asr_model.processAudio(current_recorded_audio)
-        current_recorded_transcript, current_recorded_word_locations = self.getTranscriptAndWordsLocations(
-            current_recorded_audio.shape[1])
-        current_recorded_ipa = self.ipa_converter.convertToPhonem(
-            current_recorded_transcript)
-        return current_recorded_transcript, current_recorded_ipa, current_recorded_word_locations
+    def getPronunciationAccuracy(self, real_and_transcribed_words_ipa) -> tuple:
+        if self.use_enhanced_scoring:
+            # Use enhanced phonetic-based scoring with strict mode and difficulty weighting
+            overall_accuracy, per_word_accuracy = phonetic_scoring.calculate_accuracy_with_penalty(
+                real_and_transcribed_words_ipa,
+                missing_word_penalty=0.7,  # Increased penalty for missing words
+                strict_mode=True,  # Enable strict mode for better human score correlation
+                use_difficulty_weighting=True  # Weight harder words more
+            )
+            return overall_accuracy, per_word_accuracy
+        else:
+            # Use original edit distance based scoring
+            per_word_accuracy = []
+            total_similarity = 0.0
+            total_phonemes = 0.0
 
-    def getWordLocationsFromRecordInSeconds(self, word_locations, mapped_words_indices) -> list:
-        start_time = []
-        end_time = []
-        for word_idx in range(len(mapped_words_indices)):
-            if mapped_words_indices[word_idx] < len(word_locations):
-                start_time.append(float(word_locations[mapped_words_indices[word_idx]][0]) / self.sampling_rate)
-                end_time.append(float(word_locations[mapped_words_indices[word_idx]][1]) / self.sampling_rate)
+            for real_ipa, transcribed_ipa in real_and_transcribed_words_ipa:
+                real_ipa = self.removePunctuation(real_ipa)
+                transcribed_ipa = self.removePunctuation(transcribed_ipa)
+
+                len_real = len(real_ipa)
+                if len_real == 0:
+                    word_acc = 100.0 if not transcribed_ipa else 0.0
+                else:
+                    distance = word_metrics.edit_distance_python(real_ipa, transcribed_ipa)
+                    denom = max(len_real, len(transcribed_ipa), 1)
+                    similarity = (denom - distance) / denom
+                    word_acc = max(0.0, similarity * 100.0)
+
+                per_word_accuracy.append(word_acc)
+                total_similarity += word_acc * len_real
+                total_phonemes += len_real
+
+            overall_accuracy = (total_similarity / total_phonemes) if total_phonemes > 0 else 0.0
+            return np.round(overall_accuracy), per_word_accuracy
+
+    def getWordLocationsFromRecordInSeconds(self, word_locations, mapped_indices):
+        start_time, end_time = [], []
+        num_word_locations = len(word_locations)
+        for idx in mapped_indices:
+            if 0 <= idx < num_word_locations and word_locations[idx]:
+                start = word_locations[idx].get('start_ts')
+                end = word_locations[idx].get('end_ts')
+                start_time.append(float(start) / self.sampling_rate if start is not None else 0.0)
+                end_time.append(float(end) / self.sampling_rate if end is not None else 0.0)
             else:
                 start_time.append(0.0)
                 end_time.append(0.0)
-        return ' '.join([str(time) for time in start_time]), ' '.join([str(time) for time in end_time])
+        return ' '.join(map(str, start_time)), ' '.join(map(str, end_time))
 
-    def matchSampleAndRecordedWords(self, real_text, recorded_transcript):
-        words_estimated = recorded_transcript.split()
-        words_real = real_text.split()
-        mapped_words, mapped_words_indices = wm.get_best_mapped_words(
-            words_estimated, words_real)
-        real_and_transcribed_words = []
-        real_and_transcribed_words_ipa = []
-        for word_idx in range(len(words_real)):
-            current_mapped_word = mapped_words[word_idx] if word_idx < len(mapped_words) else '-'
-            real_and_transcribed_words.append(
-                (words_real[word_idx], current_mapped_word))
-            real_and_transcribed_words_ipa.append((self.ipa_converter.convertToPhonem(words_real[word_idx]),
-                                                   self.ipa_converter.convertToPhonem(current_mapped_word)))
-        return real_and_transcribed_words, real_and_transcribed_words_ipa, mapped_words_indices
+    def getWordsPronunciationCategory(self, accuracies):
+        return [np.argmin(np.abs(self.categories_thresholds - acc)) for acc in accuracies]
 
-    def getPronunciationAccuracy(self, real_and_transcribed_words_ipa) -> float:
-        total_mismatches = 0.
-        number_of_phonemes = 0.
-        current_words_pronunciation_accuracy = []
-        for pair in real_and_transcribed_words_ipa:
-            real_without_punctuation = self.removePunctuation(pair[0]).lower()
-            transcribed_without_punctuation = self.removePunctuation(pair[1]).lower()
-            number_of_word_mismatches = word_metrics.edit_distance_python(
-                real_without_punctuation, transcribed_without_punctuation)
-            total_mismatches += number_of_word_mismatches
-            number_of_phonemes_in_word = len(real_without_punctuation)
-            number_of_phonemes += number_of_phonemes_in_word
-            if number_of_phonemes_in_word > 0:
-                accuracy = float(
-                    number_of_phonemes_in_word - number_of_word_mismatches) / number_of_phonemes_in_word * 100
-            else:
-                accuracy = 0.0
-            current_words_pronunciation_accuracy.append(accuracy)
-        
-        if number_of_phonemes > 0:
-            percentage_of_correct_pronunciations = (
-                number_of_phonemes - total_mismatches) / number_of_phonemes * 100
-        else:
-            percentage_of_correct_pronunciations = 0.0
-            
-        return np.round(percentage_of_correct_pronunciations), current_words_pronunciation_accuracy
+    def removePunctuation(self, text: str) -> str:
+        return ''.join(c for c in text if c not in punctuation)
 
-    def removePunctuation(self, word: str) -> str:
-        return ''.join([char for char in word if char not in punctuation])
-
-    def getWordsPronunciationCategory(self, accuracies) -> list:
-        categories = []
-        for accuracy in accuracies:
-            categories.append(
-                self.getPronunciationCategoryFromAccuracy(accuracy))
-        return categories
-
-    def getPronunciationCategoryFromAccuracy(self, accuracy) -> int:
-        return np.argmin(abs(self.categories_thresholds - accuracy))
-
-    def preprocessAudio(self, audio: torch.tensor) -> torch.tensor:
+    def preprocessAudio(self, audio: torch.Tensor) -> torch.Tensor:
         audio = audio - torch.mean(audio)
-        audio = audio / torch.max(torch.abs(audio))
+        audio_max = torch.max(torch.abs(audio))
+        if audio_max > 0:
+            audio = audio / audio_max
         return audio

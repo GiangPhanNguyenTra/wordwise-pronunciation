@@ -86,7 +86,7 @@ async def get_ipa(payload: IPARequest):
 
 
 if __name__ == "__main__":
-    url = "http://127.0.0.1:8000"
+    url = "http://127.0.0.1:8001"
     print(f"Starting server at {url}")
     webbrowser.open_new(url)
-    uvicorn.run("main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("main:app", host="0.0.0.0", port=8001, reload=True)
