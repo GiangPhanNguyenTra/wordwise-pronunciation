@@ -9,8 +9,6 @@ requests
 dtwalign
 eng_to_ipa
 pandas
-# flask
-# flask_cors
 pickle-mixin
 sqlalchemy
 transformers
@@ -30,5 +28,4 @@ matplotlib
 seaborn 
 tqdm 
 torchcodec
-
 python-dotenv

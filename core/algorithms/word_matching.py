@@ -1,7 +1,6 @@
 import numpy as np
 from string import punctuation
 from dtwalign import dtw_from_distance_matrix
-import time
 from typing import List, Tuple
 from . import word_metrics
 
@@ -16,7 +15,7 @@ def get_word_distance_matrix(words_estimated: list, words_real: list) -> np.ndar
                 words_estimated[idx_estimated], words_real[idx_real])
 
     for idx_real in range(number_of_real_words):
-        word_distance_matrix[number_of_estimated_words, idx_real] = len(words_real[idx_real])
+        word_distance_matrix[number_of_estimated_words, idx_real] = len(words_real[idx_real]) * 1.5 
     return word_distance_matrix
 
 def get_resulting_string(mapped_indices: np.ndarray, words_estimated: list, words_real: list) -> Tuple[List,List]:
@@ -24,6 +23,7 @@ def get_resulting_string(mapped_indices: np.ndarray, words_estimated: list, word
     mapped_words_indices = []
     WORD_NOT_FOUND_TOKEN = '-'
     number_of_real_words = len(words_real)
+    
     for word_idx in range(number_of_real_words):
         position_of_real_word_indices = np.where(mapped_indices == word_idx)[0].astype(int)
 
@@ -43,7 +43,7 @@ def get_resulting_string(mapped_indices: np.ndarray, words_estimated: list, word
             continue
 
         if len(position_of_real_word_indices) > 1:
-            error = 99999
+            error = float('inf')
             best_possible_combination = ''
             best_possible_idx = -1
             for single_word_idx in position_of_real_word_indices:
@@ -62,19 +62,15 @@ def get_resulting_string(mapped_indices: np.ndarray, words_estimated: list, word
 
     return mapped_words, mapped_words_indices
 
-def get_best_mapped_words(words_estimated: list, words_real: list, use_dtw:bool = True) -> list:
+def get_best_mapped_words(words_estimated: list, words_real: list) -> list:
     if not words_estimated or not words_real:
         return ['-'] * len(words_real), [-1] * len(words_real)
         
     word_distance_matrix = get_word_distance_matrix(words_estimated, words_real)
-    
     alignment = dtw_from_distance_matrix(word_distance_matrix.T)
     mapped_indices = alignment.get_warping_path()
 
-    mapped_words, mapped_words_indices = get_resulting_string(
-        mapped_indices, words_estimated, words_real)
-
-    return mapped_words, mapped_words_indices
+    return get_resulting_string(mapped_indices, words_estimated, words_real)
 
 def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
     real = real_word or ""
@@ -85,7 +81,6 @@ def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
     if n == 0:
         return []
 
-    # DP edit-distance alignment
     dp = np.zeros((n + 1, m + 1), dtype=int)
     for i in range(1, n + 1):
         dp[i, 0] = i
@@ -98,12 +93,11 @@ def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
             tch = trans[j - 1].lower()
             cost_sub = 0 if rch == tch else 1
             dp[i, j] = min(
-                dp[i - 1, j] + 1,          # delete
-                dp[i, j - 1] + 1,          # insert
-                dp[i - 1, j - 1] + cost_sub  # substitute / match
+                dp[i - 1, j] + 1, 
+                dp[i, j - 1] + 1,
+                dp[i - 1, j - 1] + cost_sub
             )
 
-    # backtrack để biết mỗi chữ real[i] align với trans[j] nào
     aligned_j_for_i = [None] * n
     i, j = n, m
     while i > 0 or j > 0:
@@ -112,7 +106,7 @@ def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
             tch = trans[j - 1].lower()
             cost_sub = 0 if rch == tch else 1
             if dp[i, j] == dp[i - 1, j - 1] + cost_sub:
-                aligned_j_for_i[i - 1] = j - 1  # i-1 của real map với j-1 của trans (có thể đúng hoặc sai)
+                aligned_j_for_i[i - 1] = j - 1
                 i -= 1
                 j -= 1
                 continue
@@ -132,6 +126,7 @@ def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
         if ch in punctuation:
             is_letter_correct[idx] = 1
             continue
+            
         mapped_j = aligned_j_for_i[idx]
         if mapped_j is not None and 0 <= mapped_j < m:
             if ch_low == trans[mapped_j].lower():
@@ -141,20 +136,4 @@ def getWhichLettersWereTranscribedCorrectly(real_word, transcribed_word):
         else:
             is_letter_correct[idx] = 0
 
-    return is_letter_correct
-
-    # Sửa lỗi immutable string: chuyển transcribed_word thành list để có thể sửa đổi
-    transcribed_list = list(transcribed_word)
-    is_letter_correct = [None] * len(real_word)    
-    for idx, letter in enumerate(real_word):   
-        letter = letter.lower()
-        if idx < len(transcribed_list):
-            transcribed_char = transcribed_list[idx].lower()
-            if letter == transcribed_char or letter in punctuation:
-                is_letter_correct[idx] = 1
-            else:
-                is_letter_correct[idx] = 0
-        else: # Trường hợp từ được transcribe ngắn hơn từ thật
-            is_letter_correct[idx] = 0
-            
     return is_letter_correct

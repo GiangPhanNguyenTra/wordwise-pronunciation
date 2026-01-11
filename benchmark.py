@@ -1,81 +1,92 @@
 import os
-import pandas as pd
+import json
 import torch
+import librosa
+import pandas as pd
 import numpy as np
+import argparse
 from tqdm import tqdm
-from datasets import load_dataset, Audio
-
-# Import trực tiếp các module core của bạn
 from core import pronunciation_trainer
 
-# ---- CẤU HÌNH ----
-OUTPUT_CSV = "benchmark_results_50_samples.csv"
-NUM_SAMPLES_TO_TEST = 50  # CHỈ TEST 50 MẪU ĐẦU TIÊN
-HUMAN_SCORE_MULTIPLIER = 10.0 # Chuẩn hóa điểm của con người (0-10) về thang 0-100
+DATASET_PATH = r"D:\Giang\STUDY AT UIT\HK7\KLTN\models\pronunciation\speechocean762"
+SCORES_FILE = os.path.join(DATASET_PATH, "resource", "scores.json")
+TEST_SCP_FILE = os.path.join(DATASET_PATH, "test", "wav.scp")
+OUTPUT_CSV = "final_thesis_benchmark.csv"
+TARGET_SR = 16000
 
-# ---- KHỞI TẠO CÁC THÀNH PHẦN CẦN THIẾT ----
-print("Initializing pronunciation trainer...")
 trainer = pronunciation_trainer.getTrainer("en")
 
-# ---- HÀM CHÍNH ĐỂ XỬ LÝ MỘT MẪU DỮ LIỆU ----
-def process_sample(sample):
-    """
-    Xử lý một mẫu dữ liệu từ dataset Hugging Face.
-    """
-    try:
-        # 1. Lấy thông tin cần thiết từ mẫu
-        transcript = sample['text']
-        # Điểm 'total' là điểm tổng thể của câu do chuyên gia chấm (thang 0-10)
-        human_score = sample['total'] 
-        audio_array = np.array(sample['audio']['array'], dtype=np.float32)
+def load_test_dataset():
+    wav_paths = {}
+    if os.path.exists(TEST_SCP_FILE):
+        with open(TEST_SCP_FILE, 'r', encoding='utf-8') as f:
+            for line in f:
+                parts = line.strip().split()
+                if len(parts) >= 2:
+                    utt_id = parts[0]
+                    rel_path = parts[1]
+                    wav_paths[utt_id] = os.path.join(DATASET_PATH, rel_path)
+    
+    with open(SCORES_FILE, 'r', encoding='utf-8') as f:
+        scores_data = json.load(f)
         
-        # Đảm bảo audio có đúng định dạng tensor mà trainer mong đợi
-        signal_tensor = torch.from_numpy(audio_array).unsqueeze(0)
+    test_items = []
+    for utt_id, path in wav_paths.items():
+        if utt_id in scores_data and os.path.exists(path):
+            item = scores_data[utt_id]
+            test_items.append({
+                "id": utt_id,
+                "path": path,
+                "text": item['text'],
+                "human_accuracy": item['accuracy'] * 10.0,
+                "human_completeness": item['completeness'] * 10.0,
+                "human_fluency": item['fluency'] * 10.0,
+                "human_total": item['total'] * 10.0
+            })
+            
+    return test_items
 
-        # 2. Lấy điểm của AI
-        ai_result = trainer.processAudioForGivenText(signal_tensor, transcript)
-        ai_score = ai_result.get('pronunciation_accuracy', 0.0)
-
-        # 3. Chuẩn hóa điểm của con người về thang 0-100 để so sánh
-        human_score_normalized = human_score * HUMAN_SCORE_MULTIPLIER
-
-        return {
-            "transcript": transcript,
-            "human_score": human_score_normalized,
-            "ai_score": float(ai_score)
-        }
-    except Exception as e:
-        print(f"Error processing a sample: {e}")
-        return None
-
-# ---- CHẠY BENCHMARK ----
-def run_benchmark():
-    print("Loading SpeechOcean762 dataset from Hugging Face...")
-    try:
-        # Tải tập test. Lần đầu sẽ mất thời gian tải về máy.
-        test_dataset = load_dataset("mispeech/speechocean762", split="test")
-        # Chuyển đổi cột audio sang định dạng 16kHz nếu cần
-        test_dataset = test_dataset.cast_column("audio", Audio(sampling_rate=16000))
-    except Exception as e:
-        print(f"Failed to load dataset. Error: {e}")
-        return
-
-    # Lấy ra 50 mẫu đầu tiên để test
-    small_test_set = test_dataset.select(range(NUM_SAMPLES_TO_TEST))
-    print(f"Dataset loaded. Running benchmark on {len(small_test_set)} samples...")
+def run_benchmark(num_samples=None):
+    dataset = load_test_dataset()
+    
+    if num_samples is not None and num_samples > 0:
+        dataset = dataset[:num_samples]
+        print(f"Running benchmark on {len(dataset)} samples...")
+    else:
+        print(f"Running benchmark on ALL {len(dataset)} samples...")
     
     results = []
-    for sample in tqdm(small_test_set, desc="Benchmarking"):
-        result = process_sample(sample)
-        if result:
-            results.append(result)
-
-    if results:
-        df = pd.DataFrame(results)
-        df.to_csv(OUTPUT_CSV, index=False)
-        print(f"\nBenchmark for {NUM_SAMPLES_TO_TEST} samples complete. Results saved to {OUTPUT_CSV}")
-    else:
-        print("No results were generated. Please check for errors.")
+    
+    for item in tqdm(dataset):
+        try:
+            audio, _ = librosa.load(item['path'], sr=TARGET_SR)
+            tensor = torch.from_numpy(audio).float().unsqueeze(0)
+            
+            ai_res = trainer.processAudioForGivenText(tensor, item['text'])
+            
+            results.append({
+                "id": item['id'],
+                "text": item['text'],
+                "human_accuracy": item['human_accuracy'],
+                "ai_accuracy": ai_res['pronunciation_accuracy'],
+                "human_completeness": item['human_completeness'],
+                "ai_completeness": ai_res['completeness_score'],
+                "human_fluency": item['human_fluency'],
+                "ai_fluency": ai_res['fluency_score'],
+                "human_total": item['human_total'],
+                "ai_total": ai_res['overall_total']
+            })
+            
+        except Exception as e:
+            print(f"Error processing {item['id']}: {e}")
+            
+    df = pd.DataFrame(results)
+    df.to_csv(OUTPUT_CSV, index=False)
+    print(f"Benchmark finished. Results saved to {OUTPUT_CSV}")
 
 if __name__ == "__main__":
-    run_benchmark()
+    parser = argparse.ArgumentParser(description="Run pronunciation benchmark")
+    parser.add_argument("--samples", type=int, default=None, help="Number of samples to run (default: all)")
+    args = parser.parse_args()
+    
+    run_benchmark(args.samples)

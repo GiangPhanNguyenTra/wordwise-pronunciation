@@ -95,4 +95,4 @@ venv.bak/
 dmypy.json
 
 .pyre/
-benchmark/
+benchmarks/
